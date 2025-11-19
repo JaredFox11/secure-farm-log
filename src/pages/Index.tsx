@@ -1,12 +1,17 @@
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { EquipmentCard, Equipment } from "@/components/EquipmentCard";
+import { RentalConfirmDialog } from "@/components/RentalConfirmDialog";
+import { ReturnConfirmDialog } from "@/components/ReturnConfirmDialog";
 import { useState } from "react";
 import { useAccount } from "wagmi";
 import { toast } from "sonner";
 
 const Index = () => {
   const { address, isConnected } = useAccount();
+  const [selectedEquipment, setSelectedEquipment] = useState<Equipment | null>(null);
+  const [showRentalDialog, setShowRentalDialog] = useState(false);
+  const [showReturnDialog, setShowReturnDialog] = useState(false);
   
   const [equipmentList, setEquipmentList] = useState<Equipment[]>([
     {
@@ -71,9 +76,19 @@ const Index = () => {
       return;
     }
 
+    const equipment = equipmentList.find((item) => item.id === id);
+    if (equipment) {
+      setSelectedEquipment(equipment);
+      setShowRentalDialog(true);
+    }
+  };
+
+  const confirmRental = () => {
+    if (!selectedEquipment) return;
+
     setEquipmentList((prev) =>
       prev.map((item) =>
-        item.id === id
+        item.id === selectedEquipment.id
           ? {
               ...item,
               status: "rented" as const,
@@ -88,7 +103,7 @@ const Index = () => {
       )
     );
     
-    toast.success("Rental request confirmed! Equipment is now assigned to you.", {
+    toast.success("Rental confirmed! Equipment is now assigned to you.", {
       description: "Usage data is being encrypted and logged to the blockchain.",
     });
   };
@@ -100,14 +115,23 @@ const Index = () => {
     }
 
     const equipment = equipmentList.find((item) => item.id === id);
-    if (equipment?.rentedBy?.toLowerCase() !== address?.toLowerCase()) {
+    if (!equipment) return;
+
+    if (equipment.rentedBy?.toLowerCase() !== address?.toLowerCase()) {
       toast.error("You can only return equipment you've rented");
       return;
     }
 
+    setSelectedEquipment(equipment);
+    setShowReturnDialog(true);
+  };
+
+  const confirmReturn = (notes: string) => {
+    if (!selectedEquipment) return;
+
     setEquipmentList((prev) =>
       prev.map((item) =>
-        item.id === id
+        item.id === selectedEquipment.id
           ? {
               ...item,
               status: "available" as const,
@@ -119,7 +143,7 @@ const Index = () => {
     );
     
     toast.success("Equipment returned successfully!", {
-      description: "Encrypted usage data has been logged. Thank you for using FarmLedger.",
+      description: `Encrypted usage data has been logged${notes ? " with your condition notes" : ""}. Thank you for using FarmLedger.`,
     });
   };
 
@@ -147,6 +171,37 @@ const Index = () => {
             />
           ))}
         </div>
+
+        {selectedEquipment && (
+          <>
+            <RentalConfirmDialog
+              isOpen={showRentalDialog}
+              onClose={() => {
+                setShowRentalDialog(false);
+                setSelectedEquipment(null);
+              }}
+              onConfirm={confirmRental}
+              equipment={{
+                name: selectedEquipment.name,
+                type: selectedEquipment.type,
+                hourlyRate: selectedEquipment.hourlyRate,
+              }}
+            />
+
+            <ReturnConfirmDialog
+              isOpen={showReturnDialog}
+              onClose={() => {
+                setShowReturnDialog(false);
+                setSelectedEquipment(null);
+              }}
+              onConfirm={confirmReturn}
+              equipment={{
+                name: selectedEquipment.name,
+                hourlyRate: selectedEquipment.hourlyRate,
+              }}
+            />
+          </>
+        )}
       </main>
 
       <Footer />
